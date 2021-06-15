@@ -38,6 +38,8 @@ import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 import jdk.vm.ci.meta.JavaType;
+import jdk.vm.ci.meta.Local;
+import jdk.vm.ci.meta.LocalVariableTable;
 import org.graalvm.compiler.code.CompilationResult;
 import org.graalvm.compiler.code.SourceMapping;
 import org.graalvm.compiler.core.common.CompressEncoding;
@@ -234,6 +236,39 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
             return getDeclaringClass((HostedType) javaType, true).toJavaName();
         }
         return javaType.toJavaName();
+    }
+
+    List<String> getParamNames(ResolvedJavaMethod method) {
+        LocalVariableTable localsTable = method.getLocalVariableTable();
+        Local[] params = (localsTable != null ? localsTable.getLocalsAt(0) : null);
+        /* Can only provide blank names for now. */
+        Signature signature = method.getSignature();
+        int parameterCount = signature.getParameterCount(false);
+        List<String> paramNames = new ArrayList<>(parameterCount);
+        /* need to ignore this parameter for instance methods */
+        int paramOffset = 1;
+        if (method.isStatic()) {
+            /* Signature includes no this parameter. */
+            paramOffset = 0;
+        } else {
+            ResolvedJavaType declaringClass = method.getDeclaringClass();
+            if (!declaringClass.isStatic() && declaringClass.getEnclosingType() != null) {
+                /* Signature includes a special parameter for the outer instance. */
+                paramOffset = 0;
+            }
+        }
+        for (int i = 0, idx = paramOffset; i < parameterCount; i++, idx++) {
+            String name;
+            /* sometimes local vars may not be present */
+            if (params != null && idx < params.length) {
+                name = params[idx].getName();
+            } else {
+                // use a synthetic name
+                name = "__arg" + i;
+            }
+            paramNames.add(name);
+        }
+        return paramNames;
     }
 
     private final Path cachePath = SubstrateOptions.getDebugInfoSourceCacheRoot();
@@ -683,14 +718,7 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
 
             @Override
             public List<String> paramNames() {
-                /* Can only provide blank names for now. */
-                Signature signature = hostedMethod.getSignature();
-                int parameterCount = signature.getParameterCount(false);
-                List<String> paramNames = new ArrayList<>(parameterCount);
-                for (int i = 0; i < parameterCount; i++) {
-                    paramNames.add("");
-                }
-                return paramNames;
+                return getParamNames(hostedMethod);
             }
 
             @Override
@@ -978,14 +1006,7 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
 
         @Override
         public List<String> paramNames() {
-            /* Can only provide blank names for now. */
-            Signature signature = hostedMethod.getSignature();
-            int parameterCount = signature.getParameterCount(false);
-            List<String> paramNames = new ArrayList<>(parameterCount);
-            for (int i = 0; i < parameterCount; i++) {
-                paramNames.add("");
-            }
-            return paramNames;
+            return getParamNames(hostedMethod);
         }
 
         @Override
@@ -1144,14 +1165,7 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
 
         @Override
         public List<String> paramNames() {
-            /* Can only provide blank names for now. */
-            Signature signature = method.getSignature();
-            int parameterCount = signature.getParameterCount(false);
-            List<String> paramNames = new ArrayList<>(parameterCount);
-            for (int i = 0; i < parameterCount; i++) {
-                paramNames.add("");
-            }
-            return paramNames;
+            return getParamNames(method);
         }
 
         @Override

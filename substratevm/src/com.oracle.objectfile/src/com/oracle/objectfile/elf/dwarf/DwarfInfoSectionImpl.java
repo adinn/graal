@@ -722,18 +722,16 @@ public class DwarfInfoSectionImpl extends DwarfSectionImpl {
 
     private int writeMethodParameterDeclarations(DebugContext context, ClassEntry classEntry, Range range, boolean isSpecification, byte[] buffer, int p) {
         int pos = p;
+        // implicit this is not listed in paramNames and paramTypes
         if (!Modifier.isStatic(range.getModifiers())) {
-            pos = writeMethodParameterDeclaration(context, "this", classEntry.getTypeName(), true, isSpecification, buffer, pos);
+            pos = writeMethodParameterDeclaration(context, uniqueDebugString("this"), classEntry.getTypeName(), true, isSpecification, buffer, pos);
         }
-        for (TypeEntry paramType : range.getParamTypes()) {
-            String paramTypeName = paramType.getTypeName();
-            String paramName = uniqueDebugString("");
-            FileEntry fileEntry = range.getFileEntry();
-            if (fileEntry != null) {
-                pos = writeMethodParameterDeclaration(context, paramName, paramTypeName, false, isSpecification, buffer, pos);
-            } else {
-                pos = writeMethodParameterDeclaration(context, paramTypeName, paramTypeName, false, isSpecification, buffer, pos);
-            }
+        TypeEntry[] paramTypes = range.getParamTypes();
+        String[] paramNames = range.getParamNames();
+        for (int i = 0; i < paramTypes.length; i++) {
+            String paramTypeName = paramTypes[i].getTypeName();
+            String paramName = uniqueDebugString(paramNames[i]);
+            pos = writeMethodParameterDeclaration(context, paramName, paramTypeName, false, isSpecification, buffer, pos);
         }
         return pos;
     }
@@ -751,7 +749,8 @@ public class DwarfInfoSectionImpl extends DwarfSectionImpl {
         }
         log(context, "  [0x%08x] <%d> Abbrev Number %d", pos, level, abbrevCode);
         pos = writeAbbrevCode(abbrevCode, buffer, pos);
-        /* We don't have parameter names at present. */
+        log(context, "  [0x%08x]     name  0x%x (%s)", pos, debugStringIndex(paramName), paramName);
+        pos = writeAttrStrp(paramName, buffer, pos);
         int typeIdx = getTypeIndex(paramTypeName);
         log(context, "  [0x%08x]     type 0x%x (%s)", pos, typeIdx, paramTypeName);
         pos = writeAttrRefAddr(typeIdx, buffer, pos);
