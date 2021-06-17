@@ -139,6 +139,10 @@ public interface DebugInfoProvider {
         String superName();
 
         Stream<String> interfaces();
+
+        String enclosingClassName();
+
+        int modifiers();
     }
 
     interface DebugEnumTypeInfo extends DebugInstanceTypeInfo {

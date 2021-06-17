@@ -560,6 +560,20 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
             return Arrays.stream(hostedType.getInterfaces()).map(this::toJavaName);
         }
 
+        @Override
+        public String enclosingClassName() {
+            ResolvedJavaType enclosngType = hostedType.getEnclosingType();
+            if (enclosngType != null) {
+                return toJavaName(hostedType);
+            }
+            return null;
+        }
+
+        @Override
+        public int modifiers() {
+            return hostedType.getModifiers();
+        }
+
         protected NativeImageDebugFieldInfo createDebugFieldInfo(HostedField field) {
             return new NativeImageDebugFieldInfo(field);
         }

@@ -52,6 +52,14 @@ public class ClassEntry extends StructureTypeEntry {
      */
     protected ClassEntry superClass;
     /**
+     * Details of this class's enclosing class or null.
+     */
+    protected ClassEntry enclosingClass;
+    /**
+     * Details of this class's access modifiers.
+     */
+    protected int modifiers;
+    /**
      * Details of this class's interfaces.
      */
     protected List<InterfaceClassEntry> interfaces;
@@ -136,6 +144,12 @@ public class ClassEntry extends StructureTypeEntry {
         if (superName != null) {
             this.superClass = debugInfoBase.lookupClassEntry(superName);
         }
+        String enclosingClassName =  debugInstanceTypeInfo.enclosingClassName();
+        if (enclosingClassName != null) {
+            this.enclosingClass = debugInfoBase.lookupClassEntry(enclosingClassName);
+        }
+        this.modifiers =  debugInstanceTypeInfo.modifiers();
+
         debugInstanceTypeInfo.interfaces().forEach(interfaceName -> processInterface(interfaceName, debugInfoBase, debugContext));
         /* Add details of fields and field types */
         debugInstanceTypeInfo.fieldInfoProvider().forEach(debugFieldInfo -> this.processField(debugFieldInfo, debugInfoBase, debugContext));
@@ -284,7 +298,7 @@ public class ClassEntry extends StructureTypeEntry {
         assert paramTypes.size() == paramNames.size();
         int paramCount = paramTypes.size();
         debugContext.log("typename %s adding %s method %s %s(%s)\n",
-                        typeName, memberModifiers(modifiers), resultTypeName, methodName, formatParams(paramTypes, paramNames));
+                        typeName, modifiersString(modifiers), resultTypeName, methodName, formatParams(paramTypes, paramNames));
         TypeEntry resultType = debugInfoBase.lookupTypeEntry(resultTypeName);
         TypeEntry[] paramTypeArray = new TypeEntry[paramCount];
         String[] paramNameArray = new String[paramCount];
@@ -341,6 +355,18 @@ public class ClassEntry extends StructureTypeEntry {
 
     public ClassEntry getSuperClass() {
         return superClass;
+    }
+
+    public ClassEntry getEnclosingClass() {
+        return enclosingClass;
+    }
+
+    public int getModifiers() {
+        return modifiers;
+    }
+
+    public String getModifiersString() {
+        return modifiersString(modifiers);
     }
 
     public Range makePrimaryRange(String symbolName, StringTable stringTable, MethodEntry method, int lo, int hi, int primaryLine) {

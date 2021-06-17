@@ -92,6 +92,6 @@ public abstract class MemberEntry {
     }
 
     public String getModifiersString() {
-        return ownerType.memberModifiers(modifiers);
+        return ownerType.modifiersString(modifiers);
     }
 }

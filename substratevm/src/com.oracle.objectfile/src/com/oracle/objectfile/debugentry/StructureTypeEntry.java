@@ -66,7 +66,7 @@ public abstract class StructureTypeEntry extends TypeEntry {
         int fieldoffset = debugFieldInfo.offset();
         int fieldModifiers = debugFieldInfo.modifiers();
         debugContext.log("typename %s adding %s field %s type %s size %s at offset %d\n",
-                        typeName, memberModifiers(fieldModifiers), fieldName, valueTypeName, fieldSize, fieldoffset);
+                        typeName, modifiersString(fieldModifiers), fieldName, valueTypeName, fieldSize, fieldoffset);
         TypeEntry valueType = debugInfoBase.lookupTypeEntry(valueTypeName);
         String fileName = debugFieldInfo.fileName();
         Path filePath = debugFieldInfo.filePath();
@@ -81,7 +81,7 @@ public abstract class StructureTypeEntry extends TypeEntry {
         return fieldEntry;
     }
 
-    String memberModifiers(int modifiers) {
+    String modifiersString(int modifiers) {
         StringBuilder builder = new StringBuilder();
         if (Modifier.isPublic(modifiers)) {
             builder.append("public ");
@@ -107,8 +107,6 @@ public abstract class StructureTypeEntry extends TypeEntry {
         }
         if (Modifier.isStatic(modifiers)) {
             builder.append("static");
-        } else {
-            builder.append("instance");
         }
 
         return builder.toString();
