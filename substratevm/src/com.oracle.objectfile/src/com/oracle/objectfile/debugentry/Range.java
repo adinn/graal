@@ -167,6 +167,10 @@ public class Range {
         return methodEntry.paramTypes;
     }
 
+    public String[] getParamNames() {
+        return methodEntry.paramNames;
+    }
+
     public FileEntry getFileEntry() {
         return fileEntry;
     }

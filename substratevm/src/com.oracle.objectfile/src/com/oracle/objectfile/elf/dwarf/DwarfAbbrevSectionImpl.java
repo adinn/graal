@@ -1285,9 +1285,8 @@ public class DwarfAbbrevSectionImpl extends DwarfSectionImpl {
         pos = writeAbbrevCode(abbrevCode, buffer, pos);
         pos = writeTag(DwarfDebugInfo.DW_TAG_formal_parameter, buffer, pos);
         pos = writeFlag(DwarfDebugInfo.DW_CHILDREN_no, buffer, pos);
-        /* We don't yet have parameter names. */
-        // pos = writeAttrType(DwarfDebugInfo.DW_AT_name, buffer, pos);
-        // pos = writeAttrForm(DwarfDebugInfo.DW_FORM_strp, buffer, pos);
+        pos = writeAttrType(DwarfDebugInfo.DW_AT_name, buffer, pos);
+        pos = writeAttrForm(DwarfDebugInfo.DW_FORM_strp, buffer, pos);
         if (abbrevCode == DwarfDebugInfo.DW_ABBREV_CODE_method_parameter_declaration2) {
             /* Line numbers for parameter declarations are not (yet?) available. */
             pos = writeAttrType(DwarfDebugInfo.DW_AT_decl_file, buffer, pos);
