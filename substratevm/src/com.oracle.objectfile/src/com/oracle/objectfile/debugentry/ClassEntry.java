@@ -292,13 +292,13 @@ public class ClassEntry extends StructureTypeEntry {
     protected MethodEntry processMethod(DebugMethodInfo debugMethodInfo, DebugInfoBase debugInfoBase, DebugContext debugContext) {
         String methodName = debugInfoBase.uniqueDebugString(debugMethodInfo.name());
         String resultTypeName = TypeEntry.canonicalize(debugMethodInfo.valueType());
-        int modifiers = debugMethodInfo.modifiers();
+        int methodModifiers = debugMethodInfo.modifiers();
         List<String> paramTypes = debugMethodInfo.paramTypes();
         List<String> paramNames = debugMethodInfo.paramNames();
         assert paramTypes.size() == paramNames.size();
         int paramCount = paramTypes.size();
         debugContext.log("typename %s adding %s method %s %s(%s)\n",
-                        typeName, modifiersString(modifiers), resultTypeName, methodName, formatParams(paramTypes, paramNames));
+                        typeName, modifiersString(methodModifiers), resultTypeName, methodName, formatParams(paramTypes, paramNames));
         TypeEntry resultType = debugInfoBase.lookupTypeEntry(resultTypeName);
         TypeEntry[] paramTypeArray = new TypeEntry[paramCount];
         String[] paramNameArray = new String[paramCount];
@@ -316,7 +316,7 @@ public class ClassEntry extends StructureTypeEntry {
          * substitution
          */
         FileEntry methodFileEntry = debugInfoBase.ensureFileEntry(fileName, filePath, cachePath);
-        return new MethodEntry(methodFileEntry, methodName, this, resultType, paramTypeArray, paramNameArray, modifiers, debugMethodInfo.isDeoptTarget());
+        return new MethodEntry(methodFileEntry, methodName, this, resultType, paramTypeArray, paramNameArray, methodModifiers, debugMethodInfo.isDeoptTarget());
     }
 
     @Override
