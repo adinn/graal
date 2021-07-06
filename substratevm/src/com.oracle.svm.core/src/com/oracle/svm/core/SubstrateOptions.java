@@ -468,6 +468,10 @@ public class SubstrateOptions {
             /* Keep symbols on Windows. The symbol table is part of the pdb-file. */
             DeleteLocalSymbols.update(values, newValue == 0);
         }
+        if (newValue > 0) {
+            // ensure we reparse methods
+            ParseOnce.update(values, false);
+        }
     }
 
     @Option(help = "Search path for source files for Application or GraalVM classes (list of comma-separated directories or jar files)")//

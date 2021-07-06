@@ -1002,6 +1002,12 @@ public class CompileQueue {
              */
             gbConf = gbConf.withRetainLocalVariables(true);
         }
+        /*
+         * Make sure we get as many info points as possible when debug is enabled
+         */
+        if (SubstrateOptions.GenerateDebugInfo.getValue() > 0) {
+            gbConf = gbConf.withFullInfopoints(true);
+        }
 
         return gbConf;
     }
