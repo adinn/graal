@@ -29,17 +29,35 @@ import static com.oracle.objectfile.debuginfo.DebugInfoProvider.DebugFrameSizeCh
 import static com.oracle.objectfile.debuginfo.DebugInfoProvider.DebugFrameSizeChange.Type.EXTEND;
 
 import java.lang.reflect.Modifier;
+import java.nio.file.NotDirectoryException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
+import com.oracle.svm.core.heap.ReferenceMapEncoder;
+import com.oracle.svm.core.heap.SubstrateReferenceMap;
+import com.oracle.svm.core.meta.DirectSubstrateObjectConstant;
+import com.oracle.svm.core.meta.SubstrateObjectConstant;
+import jdk.vm.ci.code.BytecodeFrame;
+import jdk.vm.ci.code.BytecodePosition;
+import jdk.vm.ci.code.DebugInfo;
+import jdk.vm.ci.code.ReferenceMap;
+import jdk.vm.ci.code.site.Call;
+import jdk.vm.ci.code.site.ImplicitExceptionDispatch;
+import jdk.vm.ci.code.site.Infopoint;
+import jdk.vm.ci.code.site.InfopointReason;
+import jdk.vm.ci.meta.JavaConstant;
 import jdk.vm.ci.meta.JavaType;
+import jdk.vm.ci.meta.JavaValue;
 import jdk.vm.ci.meta.Local;
 import jdk.vm.ci.meta.LocalVariableTable;
+import jdk.vm.ci.meta.Value;
 import org.graalvm.compiler.code.CompilationResult;
 import org.graalvm.compiler.code.SourceMapping;
 import org.graalvm.compiler.core.common.CompressEncoding;
@@ -81,6 +99,7 @@ import jdk.vm.ci.meta.ResolvedJavaField;
 import jdk.vm.ci.meta.ResolvedJavaMethod;
 import jdk.vm.ci.meta.ResolvedJavaType;
 import jdk.vm.ci.meta.Signature;
+import sun.jvm.hotspot.interpreter.Bytecode;
 
 /**
  * Implementation of the DebugInfoProvider API interface that allows type, code and heap data info
@@ -236,6 +255,17 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
             return getDeclaringClass((HostedType) javaType, true).toJavaName();
         }
         return javaType.toJavaName();
+    }
+
+    public List<String> getParamTypes(ResolvedJavaMethod method) {
+        Signature signature = method.getSignature();
+        int parameterCount = signature.getParameterCount(false);
+        List<String> paramTypes = new ArrayList<>(parameterCount);
+        for (int i = 0; i < parameterCount; i++) {
+            JavaType parameterType = signature.getParameterType(i, null);
+            paramTypes.add(toJavaName(parameterType));
+        }
+        return paramTypes;
     }
 
     List<String> getParamNames(ResolvedJavaMethod method) {
@@ -721,13 +751,7 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
 
             @Override
             public List<String> paramTypes() {
-                Signature signature = hostedMethod.getSignature();
-                int parameterCount = signature.getParameterCount(false);
-                List<String> paramTypes = new ArrayList<>(parameterCount);
-                for (int i = 0; i < parameterCount; i++) {
-                    paramTypes.add(signature.getParameterType(i, null).toJavaName());
-                }
-                return paramTypes;
+                return getParamTypes(hostedMethod);
             }
 
             @Override
@@ -1008,14 +1032,7 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
 
         @Override
         public List<String> paramTypes() {
-            Signature signature = hostedMethod.getSignature();
-            int parameterCount = signature.getParameterCount(false);
-            List<String> paramTypes = new ArrayList<>(parameterCount);
-            for (int i = 0; i < parameterCount; i++) {
-                JavaType parameterType = signature.getParameterType(i, null);
-                paramTypes.add(toJavaName(parameterType));
-            }
-            return paramTypes;
+            return getParamTypes(hostedMethod);
         }
 
         @Override
@@ -1027,8 +1044,318 @@ class NativeImageDebugInfoProvider implements DebugInfoProvider {
         public int modifiers() {
             return hostedMethod.getModifiers();
         }
-    }
 
+        public String infoDump() {
+            StringBuilder builder = new StringBuilder();
+            dumpMethodInfo(builder);
+            dumpFrames(builder);
+            dumpSourceMappings(builder);
+            dumpInfoPoints(builder);
+            return builder.toString();
+        }
+
+        public void dumpMethodInfo(StringBuilder builder) {
+            builder.append("method : ");
+            methodName(builder, hostedMethod);
+            builder.append("\n");
+        }
+
+        public void dumpFrames(StringBuilder builder) {
+            builder.append("Frame : size=");
+            hex(builder, compilation.getTotalFrameSize());
+            builder.append(" {");
+            String prefix = "\n";
+            int codeSize = compilation.getTargetCodeSize();
+            for (CompilationResult.CodeMark mark : compilation.getMarks()) {
+                int pc = mark.pcOffset;
+                if (mark.id.equals(SubstrateBackend.SubstrateMarkId.PROLOGUE_DECD_RSP)) {
+                    builder.append(prefix);
+                    builder.append("  pc : ");
+                    hex(builder, pc);
+                    builder.append(" stack_extend");
+                    prefix = ",\n";
+                } else if (mark.id.equals(SubstrateBackend.SubstrateMarkId.PROLOGUE_END)) {
+                    builder.append(prefix);
+                    builder.append("  pc : ");
+                    hex(builder, pc);
+                    builder.append(" prologue_end");
+                    prefix = ",\n";
+                } else if (mark.id.equals(SubstrateBackend.SubstrateMarkId.EPILOGUE_START)) {
+                    builder.append(prefix);
+                    builder.append("  pc : ");
+                    hex(builder, pc);
+                    builder.append(" epilogue_start");
+                    prefix = ",\n";
+                } else if (mark.id.equals(SubstrateBackend.SubstrateMarkId.EPILOGUE_INCD_RSP)) {
+                    builder.append(prefix);
+                    builder.append("  pc : ");
+                    hex(builder, pc);
+                    builder.append(" stack_contract");
+                    prefix = ",\n";
+                } else if (mark.id.equals(SubstrateBackend.SubstrateMarkId.EPILOGUE_END)) {
+                    if (pc < codeSize) {
+                        builder.append(prefix);
+                        builder.append("  pc : ");
+                        hex(builder, pc);
+                        builder.append(" epilogue_end+stack_extend");
+                        prefix = ",\n";
+                    } else {
+                        builder.append(prefix);
+                        builder.append("  pc : ");
+                        hex(builder, pc);
+                        builder.append(" epilogue_end");
+                        prefix = ",\n";
+                    }
+                }
+            }
+            if (!prefix.equals("\n")) {
+                builder.append(prefix);
+            } else {
+                builder.append(" ");
+            }
+            builder.append("}\n");
+        }
+
+        public void dumpSourceMappings(StringBuilder builder) {
+            builder.append("Source Mappings : ");
+            builder.append(" {");
+            String prefix = "\n";
+            for (SourceMapping sourceMapping: compilation.getSourceMappings()) {
+                int pc = sourceMapping.getStartOffset();
+                int pcend = sourceMapping.getEndOffset();
+                builder.append(prefix);
+                builder.append("  pc : [");
+                hex(builder, pc);
+                builder.append(", ");
+                hex(builder, pcend);
+                builder.append("] {");
+                NodeSourcePosition sourcePos = sourceMapping.getSourcePosition();
+                callChain(builder, sourcePos);
+                builder.append(" }");
+                prefix = ",\n";
+            }
+            if (!prefix.equals("\n")) {
+                builder.append(prefix);
+            } else {
+                builder.append(" ");
+            }
+            builder.append("}\n");
+        }
+
+        public void dumpInfoPoints(StringBuilder builder) {
+            builder.append("Info Points : ");
+            builder.append(" {");
+            String prefix = "\n";
+            for (Infopoint infopoint: compilation.getInfopoints()) {
+                builder.append(prefix);
+                infopoint(builder, infopoint);
+                prefix = ",\n";
+            }
+            if (prefix.equals("\n")) {
+                builder.append(" ");
+            } else {
+                builder.append("\n");
+            }
+            builder.append("}\n");
+        }
+
+        public void callChain(StringBuilder builder, NodeSourcePosition sourcePos) {
+            NodeSourcePosition nextPos = sourcePos;
+            String prefix = "";
+            int i = 0;
+            while (nextPos != null) {
+                builder.append(prefix);
+                builder.append("\n    ");
+                builder.append(i++);
+                builder.append(": ");
+                ResolvedJavaMethod method = nextPos.getMethod();
+                methodName(builder, method);
+                lineOrBCI(builder, method, nextPos.getBCI());
+                marker(builder, nextPos);
+                nextPos = nextPos.getCaller();
+            }
+        }
+
+        public void methodName(StringBuilder builder, ResolvedJavaMethod method) {
+            builder.append(method.getDeclaringClass().toJavaName());
+            builder.append("::");
+            builder.append(method.getName());
+            builder.append(method.getSignature().toMethodDescriptor());
+        }
+
+        public void lineOrBCI(StringBuilder builder, ResolvedJavaMethod method, int bci) {
+            if (bci > 0) {
+                int line = -1;
+                LineNumberTable lineNumberTable = method.getLineNumberTable();
+                if (lineNumberTable != null) {
+                    line = lineNumberTable.getLineNumber(bci);
+                }
+                if (line >= 0) {
+                    builder.append(" line ");
+                    builder.append(line);
+                }
+                builder.append(" bci ");
+                builder.append(bci);
+            }
+        }
+
+        public void marker(StringBuilder builder, NodeSourcePosition nodeSourcePosition) {
+            if (nodeSourcePosition.isSubstitution()) {
+                builder.append(" Substitution ");
+            } else if (nodeSourcePosition.isPlaceholder()) {
+                builder.append(" Placeholder ");
+            }
+        }
+
+        public void infopoint(StringBuilder builder, Infopoint infopoint) {
+            int pc = infopoint.pcOffset;
+            DebugInfo debuginfo = infopoint.debugInfo;
+            InfopointReason reason = infopoint.reason;
+            builder.append("  pc : ");
+            hex(builder, pc);
+            infopointReason(builder, reason);
+            if (infopoint.reason == InfopointReason.CALL) {
+                Call call = (Call)infopoint;
+                if (call.target instanceof ResolvedJavaMethod) {
+                    methodName(builder, (ResolvedJavaMethod) call.target);
+                } else {
+                    builder.append(call.target);
+                }
+            }
+            if (debuginfo != null) {
+                builder.append("\n  Debuginfo {\n    "  );
+                BytecodePosition bytecodePosition = debuginfo.getBytecodePosition();
+                ResolvedJavaMethod method = bytecodePosition.getMethod();
+                methodName(builder, method);
+                lineOrBCI(builder, method, bytecodePosition.getBCI());
+                BytecodeFrame frame = debuginfo.frame();
+                String prefix = "\n";
+                if (frame != null) {
+                    builder.append(prefix);
+                    frameStack(builder, frame);
+                    prefix = ",\n";
+                }
+                if (prefix == "\n") {
+                    builder.append(" }");
+                } else {
+                    builder.append("\n  }");
+                }
+            } else {
+                builder.append("\n  No Debuginfo");
+            }
+        }
+
+        public void frameStack(StringBuilder builder,  BytecodeFrame frame) {
+            builder.append("    frames {");
+            BytecodePosition next = frame;
+            String prefix = "\n      ";
+            while (next != null) {
+                builder.append(prefix);
+                bytecodePosition(builder, next);
+                next = next.getCaller();
+                prefix = ",\n      ";
+            }
+            if (prefix.equals("\n      ")) {
+                builder.append(" }");
+            } else {
+                builder.append("\n    }");
+            }
+        }
+
+
+        public void bytecodePosition(StringBuilder builder,  BytecodePosition pos) {
+            builder.append("at ");
+            ResolvedJavaMethod method = pos.getMethod();
+            methodName(builder, method);
+            lineOrBCI(builder, method, pos.getBCI());
+            if (pos instanceof BytecodeFrame) {
+                bytecodeFrame(builder, (BytecodeFrame) pos);
+            }
+        }
+
+        public void bytecodeFrame(StringBuilder builder,  BytecodeFrame frame) {
+            if (frame.duringCall) {
+                builder.append(" during call");
+            }
+            int numLocals = frame.numLocals;
+            ResolvedJavaMethod method = frame.getMethod();
+            LocalVariableTable localTable = method.getLocalVariableTable();
+            if (numLocals == 0) {
+                builder.append("\n      locals: { }");
+            } else {
+                builder.append("\n      locals: {");
+                for (int i = 0; i < numLocals; i++) {
+                    builder.append("\n        ");
+                    local(builder, localTable, frame.getBCI(), i, frame.getLocalValue(i), frame.getLocalValueKind(i));
+                }
+                builder.append("\n      }");
+            }
+        }
+
+        public void local(StringBuilder builder, LocalVariableTable localTable, int bci, int slot, JavaValue value, JavaKind kind) {
+            builder.append(slot);
+            builder.append(": ");
+            Local local = (localTable != null ? localTable.getLocal(slot, bci) : null);
+            if (local != null) {
+                builder.append(local.getName());
+                builder.append(":");
+                builder.append(local.getType().toJavaName());
+            } else {
+                builder.append("__");
+
+            }
+            builder.append(" = ");
+            if (kind == JavaKind.Illegal) {
+                builder.append("<undefined>");
+            } else if (value instanceof JavaConstant) {
+                builder.append("const ");
+                if (value instanceof DirectSubstrateObjectConstant &&
+                        ((DirectSubstrateObjectConstant)value).getObject() instanceof String) {
+                    builder.append("\"");
+                    builder.append(((JavaConstant) value).toValueString());
+                    builder.append("\"");
+                } else {
+                    builder.append(((JavaConstant) value).toValueString());
+                }
+            } else {
+                builder.append(value);
+                builder.append(" kind ");
+                builder.append(kind);
+            }
+        }
+
+        public void infopointReason(StringBuilder builder, InfopointReason reason) {
+            builder.append(" reason_");
+            switch (reason) {
+                case SAFEPOINT:
+                    builder.append("safepoint ");
+                    break;
+                case CALL:
+                    builder.append("call ");
+                    break;
+                case IMPLICIT_EXCEPTION:
+                    builder.append("implicit_exception ");
+                    break;
+                case METHOD_START:
+                    builder.append("start ");
+                    break;
+                case METHOD_END:
+                    builder.append("end ");
+                    break;
+                case BYTECODE_POSITION:
+                    builder.append("bytecode_pos ");
+                    break;
+                default:
+                    builder.append("none ");
+                    break;
+            }
+        }
+
+        public void hex(StringBuilder builder, int i) {
+            builder.append("0x");
+            builder.append(Integer.toHexString(i));
+        }
+    }
     private static boolean filterLineInfoSourceMapping(SourceMapping sourceMapping) {
         if (!SubstrateOptions.OmitInlinedMethodDebugLineInfo.getValue()) {
             return true;

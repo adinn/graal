@@ -249,6 +249,7 @@ public abstract class DebugInfoBase {
             MethodEntry methodEntry = classEntry.getMethodEntry(debugCodeInfo, this, debugContext);
             Range primaryRange = classEntry.makePrimaryRange(symbolName, stringTable, methodEntry, lo, hi, primaryLine);
             debugContext.log(DebugContext.INFO_LEVEL, "PrimaryRange %s.%s %s %s:%d [0x%x, 0x%x]", className, methodName, filePath, fileName, primaryLine, lo, hi);
+            debugContext.log(DebugContext.VERBOSE_LEVEL, "Compilation info dump\n%s", debugCodeInfo.infoDump());
             classEntry.indexPrimary(primaryRange, debugCodeInfo.getFrameSizeChanges(), debugCodeInfo.getFrameSize());
             debugCodeInfo.lineInfoProvider().forEach(debugLineInfo -> {
                 String fileNameAtLine = debugLineInfo.fileName();

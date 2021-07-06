@@ -270,6 +270,8 @@ public interface DebugInfoProvider {
          *         to an empty frame
          */
         List<DebugFrameSizeChange> getFrameSizeChanges();
+
+        String infoDump();
     }
 
     /**
