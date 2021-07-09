@@ -527,7 +527,7 @@ public class DwarfLineSectionImpl extends DwarfSectionImpl {
              * Now write a row for each subrange lo and hi.
              */
             for (Range subrange : primaryEntry.getSubranges()) {
-                if (subrange.withChildren()) {
+                if (!subrange.isLeaf()) {
                     /* skip caller subranges */
                     continue;
                 }

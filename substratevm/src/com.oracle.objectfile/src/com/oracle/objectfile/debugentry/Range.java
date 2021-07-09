@@ -42,24 +42,45 @@ public class Range {
     private final int hi;
     private final int line;
     private final boolean isInlined;
-    private final boolean withChildren;
     private boolean withInlinedChildren;
+    private int depth;
     /*
      * This is null for a primary range.
      */
     private final Range primary;
 
     /*
+     * Support for tree of nested inline callee ranges
+     */
+    /**
+     * first callee whose range is wholly contained in this range
+     */
+
+    private Range first_callee;
+
+    /**
+     * last callee whose range is wholly contained in this range
+     */
+
+    private Range last_callee;
+
+    /**
+     * link to chain callees of a given parent
+     */
+
+    private Range next_callee;
+
+    /*
      * Create a primary range.
      */
     public Range(StringTable stringTable, MethodEntry methodEntry, int lo, int hi, int line) {
-        this(stringTable, methodEntry, lo, hi, line, null, false, false, null);
+        this(stringTable, methodEntry, lo, hi, line, null, false,  null);
     }
 
     /*
      * Create a primary or secondary range.
      */
-    public Range(StringTable stringTable, MethodEntry methodEntry, int lo, int hi, int line, Range primary, boolean isInline, boolean withChildren, Range caller) {
+    public Range(StringTable stringTable, MethodEntry methodEntry, int lo, int hi, int line, Range primary, boolean isInline, Range caller) {
         assert methodEntry != null;
         if (methodEntry.fileEntry != null) {
             stringTable.uniqueDebugString(methodEntry.fileEntry.getFileName());
@@ -73,11 +94,33 @@ public class Range {
         this.line = line;
         this.isInlined = isInline;
         this.primary = primary;
-        this.withChildren = withChildren;
-        this.withInlinedChildren = false;
+        this.first_callee = null;
+        this.last_callee = null;
+        this.next_callee = null;
         this.caller = caller;
+        if (caller != null) {
+            caller.addCallee(this);
+        }
+        if (this.isPrimary()) {
+            this.depth = 0;
+        } else {
+            this.depth = caller.depth + 1;
+        }
     }
 
+    public void addCallee(Range callee) {
+        assert this.lo <= callee.lo;
+        assert this.hi >= callee.hi;
+        assert callee.caller == this;
+        assert callee.next_callee == null;
+        if (this.first_callee == null) {
+            assert this.last_callee == null;
+            this.first_callee = this.last_callee = callee;
+        } else {
+            this.last_callee.next_callee = callee;
+            this.last_callee = callee;
+        }
+    }
     public boolean contains(Range other) {
         return (lo <= other.lo && hi >= other.hi);
     }
@@ -123,7 +166,7 @@ public class Range {
     }
 
     public boolean isDeoptTarget() {
-        return methodEntry.isDeoptTarget;
+        return methodEntry.isDeopt();
     }
 
     private String getExtendedMethodName(boolean includeClass, boolean includeParams, boolean includeReturnType) {
@@ -182,19 +225,11 @@ public class Range {
         return isInlined;
     }
 
-    public boolean withChildren() {
-        return withChildren;
-    }
-
-    public boolean withInlinedChildren() {
-        return withInlinedChildren;
-    }
-
-    public boolean setWithInlinedChildren(boolean withInlinedChildren) {
-        return this.withInlinedChildren = withInlinedChildren;
-    }
-
     public Range getCaller() {
         return caller;
+    }
+
+    public boolean isLeaf() {
+        return first_callee == null;
     }
 }

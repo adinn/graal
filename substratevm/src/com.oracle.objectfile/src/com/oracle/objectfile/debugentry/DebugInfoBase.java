@@ -264,9 +264,9 @@ public abstract class DebugInfoBase {
                  * Record all subranges even if they have no line or file so we at least get a
                  * symbol for them and don't see a break in the address range.
                  */
-                ClassEntry subClassEntry = ensureClassEntry(classNameAtLine);
-                MethodEntry subMethodEntry = subClassEntry.ensureMethodEntryForDebugRangeInfo(debugLineInfo, this, debugContext);
-                Range subRange = new Range(stringTable, subMethodEntry, loAtLine, hiAtLine, line, primaryRange, isInlined, false, caller);
+                ClassEntry inlineClassEntry = ensureClassEntry(classNameAtLine);
+                MethodEntry inlineMethodEntry = inlineClassEntry.ensureMethodEntryForDebugRangeInfo(debugLineInfo, this, debugContext);
+                Range subRange = new Range(stringTable, inlineMethodEntry, loAtLine, hiAtLine, line, primaryRange, isInlined, caller);
                 classEntry.indexSubRange(subRange);
                 try (DebugContext.Scope s = debugContext.scope("Subranges")) {
                     debugContext.log(DebugContext.VERBOSE_LEVEL, "SubRange %s.%s %s %s:%d 0x%x, 0x%x]", classNameAtLine, methodNameAtLine, filePathAtLine, fileNameAtLine, line, loAtLine, hiAtLine);
@@ -370,7 +370,6 @@ public abstract class DebugInfoBase {
             return primaryRange;
         }
         Range caller = addCallersSubRanges(lineInfo.getCaller(), primaryRange, classEntry, debugContext);
-        caller.setWithInlinedChildren(true);
         final String fileName = lineInfo.fileName();
         final Path filePath = lineInfo.filePath();
         final String className = lineInfo.ownerType();
@@ -378,9 +377,9 @@ public abstract class DebugInfoBase {
         final int lo = primaryRange.getLo() + lineInfo.addressLo();
         final int hi = primaryRange.getLo() + lineInfo.addressHi();
         final int line = lineInfo.line();
-        ClassEntry subClassEntry = ensureClassEntry(className);
-        MethodEntry subMethodEntry = subClassEntry.ensureMethodEntryForDebugRangeInfo(lineInfo, this, debugContext);
-        Range subRange = new Range(stringTable, subMethodEntry, lo, hi, line, primaryRange, true, true, caller);
+        ClassEntry inlineClassEntry = ensureClassEntry(className);
+        MethodEntry inlineMethodEntry = inlineClassEntry.ensureMethodEntryForDebugRangeInfo(lineInfo, this, debugContext);
+        Range subRange = new Range(stringTable, inlineMethodEntry, lo, hi, line, primaryRange, true, caller);
         classEntry.indexSubRange(subRange);
         try (DebugContext.Scope s = debugContext.scope("Subranges")) {
             debugContext.log(DebugContext.VERBOSE_LEVEL, "SubRange %s.%s %s %s:%d 0x%x, 0x%x]",
