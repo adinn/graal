@@ -399,7 +399,6 @@ public class DwarfInfoSectionImpl extends DwarfSectionImpl {
 
         pos = writeAbstractInlineMethods(context, classEntry, buffer, pos);
 
-
         /* Write all static field definitions. */
 
         pos = writeStaticFieldLocations(context, classEntry, buffer, pos);
@@ -938,7 +937,6 @@ public class DwarfInfoSectionImpl extends DwarfSectionImpl {
             if (range.isDeoptTarget() != deoptTargets) {
                 continue;
             }
-            MethodEntry method = range.getMethodEntry();
             pos = writeMethodLocation(context, classEntry, range, buffer, pos);
             if (!primaryEntry.getPrimary().isLeaf()) {
                 /*
@@ -949,6 +947,7 @@ public class DwarfInfoSectionImpl extends DwarfSectionImpl {
         }
         return pos;
     }
+
     private int writeAbstractInlineMethods(DebugContext context, ClassEntry classEntry, byte[] buffer, int p) {
         int pos = p;
         for (MethodEntry method : classEntry.getMethods()) {
@@ -965,8 +964,8 @@ public class DwarfInfoSectionImpl extends DwarfSectionImpl {
      * Go through the subranges and generate concrete debug entries for inlined methods.
      */
     private int generateConcreteInlinedMethods(DebugContext context, ClassEntry classEntry,
-                                               PrimaryEntry primaryEntry, byte[] buffer, int p) {
-        Range primary =  primaryEntry.getPrimary();
+                    PrimaryEntry primaryEntry, byte[] buffer, int p) {
+        Range primary = primaryEntry.getPrimary();
         if (primary.isLeaf()) {
             return p;
         }

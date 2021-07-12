@@ -26,7 +26,6 @@
 
 package com.oracle.objectfile.debugentry;
 
-import com.oracle.objectfile.debuginfo.DebugInfoProvider;
 import com.oracle.objectfile.debuginfo.DebugInfoProvider.DebugCodeInfo;
 import com.oracle.objectfile.debuginfo.DebugInfoProvider.DebugLineInfo;
 import com.oracle.objectfile.debuginfo.DebugInfoProvider.DebugRangeInfo;
@@ -37,9 +36,9 @@ import java.util.stream.Collectors;
 public class MethodEntry extends MemberEntry implements Comparable<MethodEntry> {
     final TypeEntry[] paramTypes;
     final String[] paramNames;
-    final static int DEOPT = 1 << 0;
-    final static int IN_RANGE = 1 << 1;
-    final static int INLINED = 1 << 2;
+    static final int DEOPT = 1 << 0;
+    static final int IN_RANGE = 1 << 1;
+    static final int INLINED = 1 << 2;
     int flags;
     final String symbolName;
     private String signature;
@@ -148,10 +147,11 @@ public class MethodEntry extends MemberEntry implements Comparable<MethodEntry> 
                 assert fileEntry == debugInfoBase.ensureFileEntry(debugRangeInfo);
             } else {
                 /*
-                 * If the MethodEntry was added by traversing the DeclaredMethods of a Class its fileEntry
-                 * may point to the original source file, which will be wrong for substituted methods. As
-                 * a result when setting a MethodEntry as isInRange we also make sure that its fileEntry
-                 * reflects the file info associated with the corresponding Range.
+                 * If the MethodEntry was added by traversing the DeclaredMethods of a Class its
+                 * fileEntry may point to the original source file, which will be wrong for
+                 * substituted methods. As a result when setting a MethodEntry as isInRange we also
+                 * make sure that its fileEntry reflects the file info associated with the
+                 * corresponding Range.
                  */
                 setIsInRange();
                 fileEntry = debugInfoBase.ensureFileEntry(debugRangeInfo);

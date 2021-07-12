@@ -42,7 +42,6 @@ public class Range {
     private final int hi;
     private final int line;
     private final boolean isInlined;
-    private boolean withInlinedChildren;
     private int depth;
     /*
      * This is null for a primary range.
@@ -53,28 +52,28 @@ public class Range {
      * Support for tree of nested inline callee ranges
      */
     /**
-     * first callee whose range is wholly contained in this range
+     * The irst callee whose range is wholly contained in this range.
      */
 
-    private Range first_callee;
+    private Range firstCallee;
 
     /**
-     * last callee whose range is wholly contained in this range
+     * The last callee whose range is wholly contained in this range.
      */
 
-    private Range last_callee;
+    private Range lastCallee;
 
     /**
-     * link to chain callees of a given parent
+     * A link to chain callees of a given parent.
      */
 
-    private Range next_callee;
+    private Range nextCallee;
 
     /*
      * Create a primary range.
      */
     public Range(StringTable stringTable, MethodEntry methodEntry, int lo, int hi, int line) {
-        this(stringTable, methodEntry, lo, hi, line, null, false,  null);
+        this(stringTable, methodEntry, lo, hi, line, null, false, null);
     }
 
     /*
@@ -94,9 +93,9 @@ public class Range {
         this.line = line;
         this.isInlined = isInline;
         this.primary = primary;
-        this.first_callee = null;
-        this.last_callee = null;
-        this.next_callee = null;
+        this.firstCallee = null;
+        this.lastCallee = null;
+        this.nextCallee = null;
         this.caller = caller;
         if (caller != null) {
             caller.addCallee(this);
@@ -112,15 +111,16 @@ public class Range {
         assert this.lo <= callee.lo;
         assert this.hi >= callee.hi;
         assert callee.caller == this;
-        assert callee.next_callee == null;
-        if (this.first_callee == null) {
-            assert this.last_callee == null;
-            this.first_callee = this.last_callee = callee;
+        assert callee.nextCallee == null;
+        if (this.firstCallee == null) {
+            assert this.lastCallee == null;
+            this.firstCallee = this.lastCallee = callee;
         } else {
-            this.last_callee.next_callee = callee;
-            this.last_callee = callee;
+            this.lastCallee.nextCallee = callee;
+            this.lastCallee = callee;
         }
     }
+
     public boolean contains(Range other) {
         return (lo <= other.lo && hi >= other.hi);
     }
@@ -230,6 +230,6 @@ public class Range {
     }
 
     public boolean isLeaf() {
-        return first_callee == null;
+        return firstCallee == null;
     }
 }

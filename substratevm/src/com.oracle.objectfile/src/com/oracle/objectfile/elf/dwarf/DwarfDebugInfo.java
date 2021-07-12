@@ -105,7 +105,6 @@ public class DwarfDebugInfo extends DebugInfoBase {
     public static final int DW_ABBREV_CODE_method_parameter_declaration2 = 33;
     public static final int DW_ABBREV_CODE_method_parameter_declaration3 = 34;
 
-
     /*
      * Define all the Dwarf tags we need for our DIEs.
      */
