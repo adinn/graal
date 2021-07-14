@@ -27,6 +27,7 @@
 package com.oracle.objectfile.elf.dwarf;
 
 import java.lang.reflect.Modifier;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -972,31 +973,35 @@ public class DwarfInfoSectionImpl extends DwarfSectionImpl {
         int pos = p;
         log(context, "  [0x%08x] concrete entries [0x%x,0x%x] %s", pos, primary.getLo(), primary.getHi(), primary.getFullMethodName());
         int depth = 0;
-        for (Range subrange : primaryEntry.getSubranges()) {
+        Iterator<Range> iterator = primaryEntry.topDownIterator();
+        while (iterator.hasNext()) {
+            Range subrange = iterator.next();
+            // if we just stepped out of a child range write nulls for each step up
+            while (depth > subrange.getDepth()) {
+                pos = writeAttrNull(buffer, pos);
+                depth--;
+            }
             if (!subrange.isInlined()) {
+                // only happens if the subrange is for the top-level compiled method
+                assert subrange.getCaller() == primaryEntry.getPrimary();
                 continue;
             }
-            /*
-             * A run of inline subranges appears in call order ending with a leaf range.
-             */
             MethodEntry method = subrange.getMethodEntry();
             ClassEntry methodClassEntry = method.ownerType();
             String methodKey = method.getSymbolName();
             /* the abstract index was written in the method's class entry */
             int specIdx = getAbstractInlineMethodIndex(methodClassEntry, methodKey);
-            int lastPos = pos;
             pos = writeInlineSubroutine(context, classEntry, subrange, specIdx, depth, buffer, pos);
-            if (subrange.isLeaf()) {
-                while (depth > 0) {
-                    pos = writeAttrNull(buffer, pos);
-                    depth--;
-                }
-            } else if (pos != lastPos) {
-                /* we wrote an inline child so track depth */
+            if (!subrange.isLeaf()) {
+                // increment depth while write the children
                 depth++;
             }
         }
-        assert depth == 0 : depth;
+        // if we just stepped out of a child range write nulls for each step up
+        while (depth > 0) {
+            pos = writeAttrNull(buffer, pos);
+            depth--;
+        }
         return pos;
     }
 
@@ -1352,7 +1357,8 @@ public class DwarfInfoSectionImpl extends DwarfSectionImpl {
         assert callLine >= -1 : callLine;
         if (callLine == -1) {
             log(context, "  Unable to retrieve call line for inlined method %s", range.getFullMethodName());
-            return p;
+            /* continue with line 0 as we must insert a tree node */
+            callLine = 0;
         }
         Integer fileIndex;
         if (callerSubrange == range) {

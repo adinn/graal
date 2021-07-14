@@ -365,10 +365,16 @@ public abstract class DebugInfoBase {
     @SuppressWarnings("try")
     private Range addCallersSubRanges(DebugInfoProvider.DebugLineInfo lineInfo, Range primaryRange, ClassEntry classEntry, DebugContext debugContext) {
         /* Don't process the root method, it is already added as the primary range */
-        if (lineInfo == null || lineInfo.getCaller() == null) {
-            assert lineInfo == null || (lineInfo.name().equals(primaryRange.getMethodName()) && lineInfo.ownerType().equals(primaryRange.getClassName()));
+        if (lineInfo == null) {
             return primaryRange;
         }
+        // we still insert subranges for the primary method but they don't actually count as inline.
+        // we only need a range so that subranges for inline code can refer to the top level line
+        // number
+        boolean isInline = lineInfo.getCaller() != null;
+
+        assert (isInline || (lineInfo.name().equals(primaryRange.getMethodName()) && lineInfo.ownerType().equals(primaryRange.getClassName())));
+
         Range caller = addCallersSubRanges(lineInfo.getCaller(), primaryRange, classEntry, debugContext);
         final String fileName = lineInfo.fileName();
         final Path filePath = lineInfo.filePath();
@@ -379,7 +385,7 @@ public abstract class DebugInfoBase {
         final int line = lineInfo.line();
         ClassEntry inlineClassEntry = ensureClassEntry(className);
         MethodEntry inlineMethodEntry = inlineClassEntry.ensureMethodEntryForDebugRangeInfo(lineInfo, this, debugContext);
-        Range subRange = new Range(stringTable, inlineMethodEntry, lo, hi, line, primaryRange, true, caller);
+        Range subRange = new Range(stringTable, inlineMethodEntry, lo, hi, line, primaryRange, isInline, caller);
         classEntry.indexSubRange(subRange);
         try (DebugContext.Scope s = debugContext.scope("Subranges")) {
             debugContext.log(DebugContext.VERBOSE_LEVEL, "SubRange %s.%s %s %s:%d 0x%x, 0x%x]",

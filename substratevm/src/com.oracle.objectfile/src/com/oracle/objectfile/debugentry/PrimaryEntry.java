@@ -28,8 +28,9 @@ package com.oracle.objectfile.debugentry;
 
 import com.oracle.objectfile.debuginfo.DebugInfoProvider.DebugFrameSizeChange;
 
-import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Stack;
 
 /**
  * Tracks debug info associated with a primary method. i.e. a top level compiled method
@@ -44,10 +45,6 @@ public class PrimaryEntry {
      */
     private ClassEntry classEntry;
     /**
-     * A list of subranges associated with the primary range.
-     */
-    private List<Range> subranges;
-    /**
      * Details of of compiled method frame size changes.
      */
     private List<DebugFrameSizeChange> frameSizeInfos;
@@ -59,20 +56,8 @@ public class PrimaryEntry {
     public PrimaryEntry(Range primary, List<DebugFrameSizeChange> frameSizeInfos, int frameSize, ClassEntry classEntry) {
         this.primary = primary;
         this.classEntry = classEntry;
-        this.subranges = new ArrayList<>();
         this.frameSizeInfos = frameSizeInfos;
         this.frameSize = frameSize;
-    }
-
-    public void addSubRange(Range subrange) {
-        /*
-         * We should not see a subrange more than once.
-         */
-        assert !subranges.contains(subrange);
-        /*
-         * We need to generate a file table entry for all ranges.
-         */
-        subranges.add(subrange);
     }
 
     public Range getPrimary() {
@@ -83,8 +68,71 @@ public class PrimaryEntry {
         return classEntry;
     }
 
-    public List<Range> getSubranges() {
-        return subranges;
+    public Iterator<Range> topDownIterator() {
+        return new Iterator<Range>() {
+            final Stack<Range> workList = new Stack<>();
+            Range current = primary.getFirstCallee();
+
+            @Override
+            public boolean hasNext() {
+                return current != null;
+            }
+
+            @Override
+            public Range next() {
+                assert hasNext();
+                Range result = current;
+                forward();
+                return result;
+            }
+
+            private void forward() {
+                Range sibling = current.getNextCallee();
+                if (!current.isLeaf()) {
+                    // save next sibling while we process the children
+                    if (sibling != null) {
+                        workList.push(sibling);
+                    }
+                    current = current.getFirstCallee();
+                } else if (sibling != null) {
+                    current = sibling;
+                } else {
+                    // return back up to parents' siblings
+                    current = workList.isEmpty() ? null : workList.pop();
+                }
+            }
+        };
+    }
+
+    public Iterator<Range> leafIterator() {
+        final Iterator<Range> t = topDownIterator();
+        return new Iterator<Range>() {
+            Range current = forwardLeaf(t);
+
+            @Override
+            public boolean hasNext() {
+                return current != null;
+            }
+
+            @Override
+            public Range next() {
+                assert hasNext();
+                Range result = current;
+                current = forwardLeaf(t);
+                return result;
+            }
+
+            private Range forwardLeaf(Iterator<Range> t) {
+                if (t.hasNext()) {
+                    Range next = t.next();
+                    while (next != null && !next.isLeaf()) {
+                        next = t.next();
+                    }
+                    return next;
+                }
+                return null;
+            }
+        };
     }
 
     public List<DebugFrameSizeChange> getFrameSizeInfos() {

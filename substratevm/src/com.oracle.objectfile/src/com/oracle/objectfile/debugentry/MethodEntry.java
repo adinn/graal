@@ -138,8 +138,11 @@ public class MethodEntry extends MemberEntry implements Comparable<MethodEntry> 
      */
     public void updateRangeInfo(DebugInfoBase debugInfoBase, DebugRangeInfo debugRangeInfo) {
         if (debugRangeInfo instanceof DebugLineInfo) {
-            /* this method has been seen in inline info */
-            setIsInlined();
+            DebugLineInfo lineInfo = (DebugLineInfo) debugRangeInfo;
+            if (lineInfo.getCaller() != null) {
+                /* this is a real inlined method not just a top level primary range */
+                setIsInlined();
+            }
         } else if (debugRangeInfo instanceof DebugCodeInfo) {
             /* this method has been seen in a primary range */
             if (isInRange()) {

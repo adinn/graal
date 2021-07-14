@@ -170,7 +170,6 @@ public class ClassEntry extends StructureTypeEntry {
         /* We should already have seen the primary range. */
         assert primaryEntry != null;
         assert primaryEntry.getClassEntry() == this;
-        primaryEntry.addSubRange(subrange);
         FileEntry subFileEntry = subrange.getFileEntry();
         if (subFileEntry != null) {
             indexLocalFileEntry(subFileEntry);
@@ -277,7 +276,13 @@ public class ClassEntry extends StructureTypeEntry {
 
     protected MethodEntry processMethod(DebugMethodInfo debugMethodInfo, DebugInfoBase debugInfoBase, DebugContext debugContext) {
         boolean fromRange = debugMethodInfo instanceof DebugCodeInfo;
-        boolean fromInlineRange = debugMethodInfo instanceof DebugLineInfo;
+        boolean fromInlineRange = false;
+        if (debugMethodInfo instanceof DebugLineInfo) {
+            DebugLineInfo lineInfo = (DebugLineInfo) debugMethodInfo;
+            if (lineInfo.getCaller() != null) {
+                fromInlineRange = true;
+            }
+        }
         String methodName = debugInfoBase.uniqueDebugString(debugMethodInfo.name());
         String resultTypeName = TypeEntry.canonicalize(debugMethodInfo.valueType());
         int modifiers = debugMethodInfo.modifiers();

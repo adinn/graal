@@ -101,7 +101,7 @@ public class Range {
             caller.addCallee(this);
         }
         if (this.isPrimary()) {
-            this.depth = 0;
+            this.depth = -1;
         } else {
             this.depth = caller.depth + 1;
         }
@@ -229,7 +229,23 @@ public class Range {
         return caller;
     }
 
+    public Range getFirstCallee() {
+        return firstCallee;
+    }
+
+    public Range getNextCallee() {
+        return nextCallee;
+    }
+
+    public Range getLastCallee() {
+        return lastCallee;
+    }
+
     public boolean isLeaf() {
         return firstCallee == null;
+    }
+
+    public int getDepth() {
+        return depth;
     }
 }
